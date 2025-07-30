@@ -6,7 +6,6 @@ const userSchema = new mongoose.Schema({
   password: { type: String, required: true },
   phone: { type: String },
   role: { type: String, enum: ['admin', 'student'], default: 'student' },
-  profilePicture: { type: String, default: '' },
   course: { type: String, required: function() { return this.role === 'student'; } },
   enrollmentYear: { type: Number, required: function() { return this.role === 'student'; } },
   status: { 

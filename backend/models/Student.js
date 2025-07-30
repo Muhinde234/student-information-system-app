@@ -37,7 +37,6 @@ const studentSchema = new mongoose.Schema({
   timestamps: true
 });
 
-// Generate student ID before saving
 studentSchema.pre('save', async function(next) {
   if (!this.studentId) {
     const year = this.enrollmentYear.toString();

@@ -1,8 +1,9 @@
 const User = require('../models/User');
 
-// @desc    Get all students
 const getStudents = async (req, res) => {
   try {
+    console.log('Admin getting students, user:', req.user?.email, 'role:', req.user?.role);
+    
     const { status, course } = req.query;
     const filter = { role: 'student' };
     
@@ -10,37 +11,131 @@ const getStudents = async (req, res) => {
     if (course) filter.course = course;
     
     const students = await User.find(filter).select('-password');
-    res.json(students);
+    
+    res.json({
+      success: true,
+      count: students.length,
+      data: students
+    });
   } catch (error) {
-    res.status(500).json({ message: 'Server error' });
+    console.error('Get students error:', error);
+    res.status(500).json({ 
+      success: false,
+      message: 'Server error',
+      error: error.message 
+    });
   }
 };
 
-// @desc    Update user (admin only)
 const updateUser = async (req, res) => {
   try {
     const user = await User.findById(req.params.id);
-    if (!user) return res.status(404).json({ message: 'User not found' });
+    if (!user) {
+      return res.status(404).json({ 
+        success: false,
+        message: 'User not found' 
+      });
+    }
 
+    
+    const allowedUpdates = ['name', 'email', 'phone', 'course', 'enrollmentYear', 'status', 'role'];
+    const updates = {};
+    
     Object.keys(req.body).forEach(key => {
-      if (key !== 'password' && key in user) user[key] = req.body[key];
+      if (allowedUpdates.includes(key)) {
+        updates[key] = req.body[key];
+      }
     });
 
-    await user.save();
-    res.json(user);
+    const updatedUser = await User.findByIdAndUpdate(
+      req.params.id,
+      updates,
+      { new: true, runValidators: true }
+    ).select('-password');
+
+    res.json({
+      success: true,
+      message: 'User updated successfully',
+      data: updatedUser
+    });
   } catch (error) {
-    res.status(400).json({ message: 'Update failed' });
+    console.error('Update user error:', error);
+    res.status(400).json({ 
+      success: false,
+      message: 'Update failed',
+      error: error.message 
+    });
   }
 };
 
-// @desc    Delete user
 const deleteUser = async (req, res) => {
   try {
+    const user = await User.findById(req.params.id);
+    if (!user) {
+      return res.status(404).json({ 
+        success: false,
+        message: 'User not found' 
+      });
+    }
+
     await User.findByIdAndDelete(req.params.id);
-    res.json({ message: 'User removed' });
+    
+    res.json({
+      success: true,
+      message: 'User deleted successfully'
+    });
   } catch (error) {
-    res.status(500).json({ message: 'Server error' });
+    console.error('Delete user error:', error);
+    res.status(500).json({ 
+      success: false,
+      message: 'Server error',
+      error: error.message 
+    });
   }
 };
 
-module.exports = { getStudents, updateUser, deleteUser };
+const createStudent = async (req, res) => {
+  const { name, email, password, phone, course, enrollmentYear, status } = req.body;
+  
+  try {
+    // Check if user already exists
+    let existingUser = await User.findOne({ email });
+    if (existingUser) {
+      return res.status(400).json({ 
+        success: false,
+        message: 'User with this email already exists' 
+      });
+    }
+
+    const bcrypt = require('bcryptjs');
+    const student = new User({
+      name,
+      email,
+      password: await bcrypt.hash(password, 10),
+      phone,
+      role: 'student',
+      course,
+      enrollmentYear,
+      status: status || 'Active'
+    });
+
+    await student.save();
+    
+    const studentResponse = await User.findById(student._id).select('-password');
+    
+    res.status(201).json({
+      success: true,
+      message: 'Student created successfully',
+      data: studentResponse
+    });
+  } catch (error) {
+    console.error('Create student error:', error);
+    res.status(500).json({ 
+      success: false,
+      message: 'Server error',
+      error: error.message 
+    });
+  }
+};
+
+module.exports = { getStudents, updateUser, deleteUser, createStudent };

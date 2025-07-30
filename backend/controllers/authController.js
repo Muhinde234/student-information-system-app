@@ -2,7 +2,7 @@ const User = require('../models/User');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 
-// @desc    Register new user
+
 const register = async (req, res) => {
   const { name, email, password, phone, role, course, enrollmentYear } = req.body;
   
@@ -22,13 +22,15 @@ const register = async (req, res) => {
     await user.save();
     
     const token = generateToken(user._id);
-    res.status(201).json({ token, user });
+    const userResponse = await User.findById(user._id).select('-password');
+    res.status(201).json({ token, user: userResponse });
   } catch (error) {
-    res.status(500).json({ message: 'Server error' });
+    console.error('Registration error:', error);
+    res.status(500).json({ message: 'Server error', error: error.message });
   }
 };
 
-// @desc    Authenticate user
+
 const login = async (req, res) => {
   const { email, password } = req.body;
 
@@ -40,9 +42,11 @@ const login = async (req, res) => {
     if (!isMatch) return res.status(400).json({ message: 'Invalid credentials' });
 
     const token = generateToken(user._id);
-    res.json({ token, user });
+    const userResponse = await User.findById(user._id).select('-password');
+    res.json({ token, user: userResponse });
   } catch (error) {
-    res.status(500).json({ message: 'Server error' });
+    console.error('Login error:', error);
+    res.status(500).json({ message: 'Server error', error: error.message });
   }
 };
 
