@@ -1,0 +1,64 @@
+const jwt = require('jsonwebtoken');
+const asyncWrapper = require('../Middleware/async');
+const userModel = require('../Models/userModel');
+
+const Notfound = require('../Error/NotFound');
+
+const login_post = asyncWrapper(async (req, res, next) => {
+    const { email, password } = req.body;
+    const secret = process.env.SECRET_KEY;
+
+    let user;
+    try {
+        user = await userModel.login(email, password);
+    } catch (error) {
+        console.error('Login error:', error);
+        return next(new Notfound('Invalid email or password'));
+    }
+
+    const { _id: userId, username, role } = user;
+
+   const validRoles = ['student', 'admin'];
+    if (role && !validRoles.includes(role)) {
+        return next(new BadRequest('Invalid user role'));
+    }
+
+    
+    const token = jwt.sign({ userId, username, role }, secret, {
+        expiresIn: '1h',
+    });
+
+    const expiryDate = new Date(Date.now() + 1 * 24 * 60 * 60 * 1000);
+    res.setHeader('Authorization', `Bearer ${token}`);
+    res.cookie('jwt', token, {
+        httpOnly: true,
+        path: '/',
+        expires: expiryDate,
+        secure: true,
+        sameSite: 'Strict'
+    });
+
+    res.status(200).json({ user, token });
+});
+
+const logout = asyncWrapper(async (req, res, next) => {
+    const token = req.cookies.jwt;
+    if (!token) {
+        return res.status(401).json({ error: 'Unauthorized: No token provided' });
+    }
+
+    const secret = process.env.SECRET_KEY;
+    jwt.verify(token, secret, (err) => {
+        if (err) {
+            return res.status(401).json({ error: 'Unauthorized: Invalid token' });
+        } else {
+            res.clearCookie('jwt');
+            res.json({ message: 'Logged out successfully' });
+        }
+    });
+});
+
+module.exports = {
+    login_post,
+    logout
+};
